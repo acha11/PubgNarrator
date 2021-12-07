@@ -10,7 +10,7 @@ namespace PubgApiTest
 {
     public class KillsOverviewGraphGenerator
     {
-        public void Generate(StreamWriter sw, Dictionary<string, PlayerInfo> players, string title)
+        public void Generate(StreamWriter sw, Dictionary<string, PlayerInfo> players, string title, string playerAccountId)
         {
             GraphVizWriter writer = new GraphVizWriter(sw);
 
@@ -22,13 +22,15 @@ namespace PubgApiTest
             writer.WriteKvp("fontsize", "30");
             writer.WriteKvp("fontname", "Verdana");
 
+            var playerTeamId = players[playerAccountId].TeamId;
+
             foreach (var p in players.Values)
             {
                 string fillcolor;
 
                 if (!p.IsBot)
                 {
-                    if (p.Name == "acha11" || p.Name == "ledpup" || p.Name == "RavenMark" || p.Name == "Playcache")
+                    if (p.TeamId == playerTeamId)
                     {
                         fillcolor = "yellow";
                     }

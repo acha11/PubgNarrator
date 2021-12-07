@@ -22,13 +22,17 @@ namespace PubgApiTest
             _pubgApi = pubgApi;
         }
 
-        public void ProcessRecentMatchesForPlayer(string playerName)
+        public void ProcessRecentMatchesForPlayer(string playerName, int numberOfMatches = 5)
         {
             string rawResponse = _pubgApi.ExecuteGetRequest("https://api.pubg.com/shards/steam/players?filter[playerNames]=" + playerName, false);
 
             var playerInfo = JObject.Parse(rawResponse);
 
             var matchDatas = playerInfo.SelectToken("data[0].relationships.matches.data");
+
+            var playerAccountId = playerInfo.SelectToken("data[0].id").ToString();
+
+            var machesProcessed = 0;
 
             foreach (var matchData in matchDatas)
             {
@@ -69,12 +73,18 @@ namespace PubgApiTest
 
                 if (telemetryUrl != null)
                 {
-                    ProcessTelemetry(telemetryUrl, matchLocalTime);
+                    ProcessTelemetry(telemetryUrl, matchLocalTime, playerAccountId);
+                }
+
+                machesProcessed++;
+                if (machesProcessed == numberOfMatches)
+                {
+                    break;
                 }
             }
         }
 
-        void ProcessTelemetry(string telemetryUrl, DateTime matchLocalTime)
+        void ProcessTelemetry(string telemetryUrl, DateTime matchLocalTime, string playerAccountId)
         {
             _playersByAccountId = new Dictionary<string, PlayerInfo>();
 
@@ -96,7 +106,7 @@ namespace PubgApiTest
                 {
                     var msg = JsonConvert.DeserializeObject<LogPlayerCreateModel>(node.ToString());
 
-                    EnsurePlayerInfo(msg.Character.AccountId, msg.Character.Name, msg.Character.AccountId.StartsWith("ai."));
+                    EnsurePlayerInfo(msg.Character.AccountId, msg.Character.Name, msg.Character.AccountId.StartsWith("ai."), msg.Character.TeamId);
                 }
 
                 if (t == "LogMatchEnd")
@@ -164,7 +174,7 @@ namespace PubgApiTest
 
             using (var sw = new StreamWriter(dotFilename))
             {
-                new KillsOverviewGraphGenerator().Generate(sw, _playersByAccountId, "Match at " + matchLocalTime.ToString());
+                new KillsOverviewGraphGenerator().Generate(sw, _playersByAccountId, "Match at " + matchLocalTime.ToString(), playerAccountId);
             }
 
             var p =
@@ -197,7 +207,7 @@ namespace PubgApiTest
             Process.Start(new ProcessStartInfo() { FileName = svgFilename, UseShellExecute = true });
         }
 
-        PlayerInfo EnsurePlayerInfo(string accountId, string playerName, bool playerIsBot)
+        PlayerInfo EnsurePlayerInfo(string accountId, string playerName, bool playerIsBot, int? teamId)
         {
             if (!_playersByAccountId.TryGetValue(accountId, out var pi))
             {
@@ -206,7 +216,8 @@ namespace PubgApiTest
                     {
                         AccountId = accountId,
                         Name = playerName,
-                        IsBot = playerIsBot
+                        IsBot = playerIsBot,
+                        TeamId = teamId,
                     };
 
                 _playersByAccountId[accountId] = pi;

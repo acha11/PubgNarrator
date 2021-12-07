@@ -16,6 +16,7 @@ namespace PubgApiTest
         public PlayerInfo Killer { get; set; }
         public bool Dies { get; set; }
         public bool IsWinner { get; set; }
+        public int? TeamId { get; set; }
 
         public Dictionary<string, double> DamageDealtByAccountId { get; set; } = new Dictionary<string, double>();
 

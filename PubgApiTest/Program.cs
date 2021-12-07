@@ -10,7 +10,9 @@ namespace PubgApiTest
 
             BatchProcessor batchProcessor = new BatchProcessor(api);
 
-            batchProcessor.ProcessRecentMatchesForPlayer(args[0]);
+            var numberOfMatches = args.Length > 2 ? int.Parse(args[2]) : 5;
+
+            batchProcessor.ProcessRecentMatchesForPlayer(args[0], numberOfMatches);
         }
     }
 }
