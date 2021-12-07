@@ -1,4 +1,4 @@
-﻿namespace PubgApiTest
+﻿namespace PubgApiTest.PubgApi.ApiModels
 {
     public class LogPlayerKillV2Model
     {

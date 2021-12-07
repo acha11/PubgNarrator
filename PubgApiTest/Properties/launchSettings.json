@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "PubgApiTest": {
+      "commandName": "Project",
+      "commandLineArgs": "acha11 eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiJlM2M0NzU3MC00MWRmLTAxMzYtZWEyNy0yMWQxYzFmODQ1N2QiLCJpc3MiOiJnYW1lbG9ja2VyIiwiaWF0IjoxNTI3MjA3ODU5LCJwdWIiOiJibHVlaG9sZSIsInRpdGxlIjoicHViZyIsImFwcCI6Im9ic2VydmVyIn0.2ECB5g0pgmzLyXEtYhEOwyvFoeH2ziRiamTDlwhFl8A"
+    }
+  }
+}
