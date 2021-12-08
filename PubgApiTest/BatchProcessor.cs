@@ -28,11 +28,11 @@ namespace PubgApiTest
 
             var playerInfo = JObject.Parse(rawResponse);
 
-            var matchDatas = playerInfo.SelectToken("data[0].relationships.matches.data");
+            var matchDatas = playerInfo
+                                .SelectToken("data[0].relationships.matches.data")
+                                .Take(numberOfMatches);
 
             var playerAccountId = playerInfo.SelectToken("data[0].id").ToString();
-
-            var machesProcessed = 0;
 
             foreach (var matchData in matchDatas)
             {
@@ -74,12 +74,6 @@ namespace PubgApiTest
                 if (telemetryUrl != null)
                 {
                     ProcessTelemetry(telemetryUrl, matchLocalTime, playerAccountId);
-                }
-
-                machesProcessed++;
-                if (machesProcessed == numberOfMatches)
-                {
-                    break;
                 }
             }
         }
