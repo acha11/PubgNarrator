@@ -1,8 +1,8 @@
-﻿using System;
+﻿using System.Collections.Generic;
 
 namespace PubgApiTest.PubgApi.ApiModels
 {
-    public class LogPlayerTakeDamageModel : BaseTelemetryEventModel
+    public class LogPlayerMakeGroggyModel : BaseTelemetryEventModel
     {
         public class PlayerModel
         {
@@ -12,9 +12,7 @@ namespace PubgApiTest.PubgApi.ApiModels
 
         public PlayerModel Victim { get; set; }
         public PlayerModel Attacker { get; set; }
-
         public string DamageTypeCategory { get; set; }
-        public string DamageReason { get; set; }
         public double Damage { get; set; }
     }
 }

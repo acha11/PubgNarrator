@@ -10,6 +10,13 @@ namespace PubgApiTest
 {
     public class KillsOverviewGraphGenerator
     {
+        DateTime _matchStartTime;
+        
+        public KillsOverviewGraphGenerator(DateTime matchStartTime)
+        {
+            _matchStartTime = matchStartTime;
+        }
+
         public void Generate(StreamWriter sw, Dictionary<string, PlayerInfo> players, string title, string playerAccountId)
         {
             GraphVizWriter writer = new GraphVizWriter(sw);
@@ -22,9 +29,11 @@ namespace PubgApiTest
             writer.WriteKvp("fontsize", "30");
             writer.WriteKvp("fontname", "Verdana");
 
+            bool ignoreBots = false;
+
             var playerTeamId = players[playerAccountId].TeamId;
 
-            foreach (var p in players.Values)
+            foreach (var p in players.Values.Where(x => !ignoreBots || !x.IsBot))
             {
                 string fillcolor;
 
@@ -47,21 +56,45 @@ namespace PubgApiTest
                 sw.WriteLine("   \"" + p.Name + "\" [fillcolor=\"" + fillcolor + "\", style=\"filled\"];");
             }
 
-            WriteCluster(writer, "cluster_0", "Winners", players.Values.Where(x => x.IsWinner).Select(x => x.Name));
-            WriteCluster(writer, "cluster_1", "Probably logged out", players.Values.Where(x => !x.Dies && !x.IsWinner).Select(x => x.Name));
-            WriteCluster(writer, "cluster_2", "Died to environment", players.Values.Where(x => x.Killer == null && x.Dies).Select(x => x.Name));
+            WriteCluster(writer, "cluster_0", "Winners",             players.Values.Where(x => GetNodeCategory(x) == NodeCategory.Winner));
+            WriteCluster(writer, "cluster_1", "Probably logged out", players.Values.Where(x => GetNodeCategory(x) == NodeCategory.ProbablyLoggedOut));
+            WriteCluster(writer, "cluster_2", "Died to environment", players.Values.Where(x => GetNodeCategory(x) == NodeCategory.DiedToEnvironment && (!ignoreBots || !x.IsBot)));
+
+            foreach (var player in players.Values.Where(x => GetNodeCategory(x) == NodeCategory.Other && (!ignoreBots || !x.IsBot)))
+            {
+                writer.RawWrite("   \"" + player.Name + "\" [label=\"" + BuildNodeLabel(player).Replace("\"", "\"\"") + "\"];");
+            }
+
 
             foreach (var p in players.Values)
             {
-                DumpKillGraph(writer, p);
-                DumpAssistGraph(writer, p);
+                DumpDbnoGraph(writer, p, ignoreBots);
+                DumpReviveesGraph(writer, p);
+                DumpKillGraph(writer, p, ignoreBots);
+                DumpAssistGraph(writer, p, ignoreBots);
                 //DumpDamageGraph(p, players);
             }
 
             writer.RawWrite("}");
         }
 
-        void WriteCluster(GraphVizWriter gvw, string clusterKey, string clusterLabel, IEnumerable<string> clusterNodeKeys)
+        NodeCategory GetNodeCategory(PlayerInfo pi)
+        {
+            if (pi.IsWinner) return NodeCategory.Winner;
+            if (!pi.Dies) return NodeCategory.ProbablyLoggedOut;
+            if (pi.Killer == null && pi.Dies) return NodeCategory.DiedToEnvironment;
+            return NodeCategory.Other;
+        }
+
+        enum NodeCategory
+        {
+            Winner,
+            ProbablyLoggedOut,
+            DiedToEnvironment,
+            Other
+        }
+
+        void WriteCluster(GraphVizWriter gvw, string clusterKey, string clusterLabel, IEnumerable<PlayerInfo> playersInCluster)
         {
             // Put the DiedToEnvironment-ers in a box
             gvw.RawWrite("subgraph " + clusterKey + " {");
@@ -69,27 +102,97 @@ namespace PubgApiTest
             gvw.WriteKvp("style", "filled");
             gvw.WriteKvp("color", "lightgrey");
 
-            foreach (var nodeKey in clusterNodeKeys)
+            foreach (var player in playersInCluster)
             {
-                gvw.RawWrite("   \"" + nodeKey + "\";");
+                gvw.RawWrite("   \"" + player.Name + "\" [label=\"" + BuildNodeLabel(player).Replace("\"", "\"\"") + "\"];");
             }
 
             gvw.RawWrite("}");
         }
 
-        void DumpKillGraph(GraphVizWriter gvw, PlayerInfo p)
+        string BuildNodeLabel(PlayerInfo player)
         {
-            foreach (var victim in p.Kills)
+            StringBuilder sb = new StringBuilder();
+
+            sb.AppendLine(player.Name);
+
+            foreach (var evtGroup in player.Events.GroupBy(x => x.Type))
             {
-                gvw.WriteEdge(p.Name, victim.Name, "[color=red label=" + p.GetDamageDealtTo(victim.AccountId) + "]");
+                sb.Append(evtGroup.Key);
+
+                var times = evtGroup.Where(x => x.Time != null).Select(x => MatchElapsed((DateTime)x.Time)).ToArray();
+
+                if (times.Any())
+                {
+                    sb.Append(" @ ");
+                    sb.Append(String.Join(", ", times));
+                }
+
+                var amounts = string.Join(",", evtGroup.Where(x => x.Amount != null).Select(x => x.Amount.ToString()));
+
+                if (amounts.Length > 0)
+                {
+                    sb.Append("(" + amounts + ")");
+                }
+                 
+                sb.Append("\\n");
+            }
+
+            if (player.Dies)
+            {
+                sb.Append("\\n\\nDied: " + MatchElapsed((DateTime)player.DiesAt));
+            }
+
+            return sb.ToString();
+        }
+
+        string MatchElapsed(DateTime t)
+        {
+            var elapsed = t - _matchStartTime;
+
+            return ((int)elapsed.TotalMinutes) + "m" + elapsed.Seconds + "s";
+        }
+
+        void DumpDbnoGraph(GraphVizWriter gvw, PlayerInfo p, bool ignoreBots)
+        {
+            foreach (var victim in p.Dbnos)
+            {
+                if (ignoreBots && victim.IsBot) continue;
+
+                // If the killer was also the knocker, don't write this edge.
+                if (victim.Killer != p)
+                {
+                    gvw.WriteEdge(p.Name, victim.Name, "[color=blue label=" + p.GetDamageDealtTo(victim.AccountId) + "]");
+                }
+            }
+        }
+        void DumpReviveesGraph(GraphVizWriter gvw, PlayerInfo p)
+        {
+            foreach (var victim in p.Revivees)
+            {
+                gvw.WriteEdge(p.Name, victim.Name, "[color=green label=Revived]");
             }
         }
 
-        void DumpAssistGraph(GraphVizWriter gvw, PlayerInfo p)
+        void DumpKillGraph(GraphVizWriter gvw, PlayerInfo p, bool ignoreBots)
+        {
+            foreach (var victim in p.Kills)
+            {
+                if (!ignoreBots || !victim.IsBot)
+                {
+                    gvw.WriteEdge(p.Name, victim.Name, "[color=red label=\"" + p.GetDamageDealtTo(victim.AccountId) + " | " + victim.GetDamageDealtTo(p.AccountId) + "\"]");
+                }
+            }
+        }
+
+        void DumpAssistGraph(GraphVizWriter gvw, PlayerInfo p, bool ignoreBots)
         {
             foreach (var victim in p.Assists)
             {
-                gvw.WriteEdge(p.Name, victim.Name, "[color=black   style=dashed  label=" + p.GetDamageDealtTo(victim.AccountId) + "]");
+                if (!ignoreBots || !victim.IsBot)
+                {
+                    gvw.WriteEdge(p.Name, victim.Name, "[color=black   style=dashed  label=" + p.GetDamageDealtTo(victim.AccountId) + "]");
+                }
             }
         }
 

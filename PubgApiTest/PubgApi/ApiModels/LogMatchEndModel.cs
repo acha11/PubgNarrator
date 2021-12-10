@@ -1,6 +1,6 @@
 ﻿namespace PubgApiTest.PubgApi.ApiModels
 {
-    public class LogMatchEndModel
+    public class LogMatchEndModel : BaseTelemetryEventModel
     {
         public class GameResultOnFinishedModel
         {
