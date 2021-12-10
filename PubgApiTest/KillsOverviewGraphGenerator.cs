@@ -17,7 +17,7 @@ namespace PubgApiTest
             _matchStartTime = matchStartTime;
         }
 
-        public void Generate(StreamWriter sw, Dictionary<string, PlayerInfo> players, string title)
+        public void Generate(StreamWriter sw, Dictionary<string, PlayerInfo> players, string title, string playerAccountId)
         {
             GraphVizWriter writer = new GraphVizWriter(sw);
 
@@ -31,13 +31,15 @@ namespace PubgApiTest
 
             bool ignoreBots = false;
 
+            var playerTeamId = players[playerAccountId].TeamId;
+
             foreach (var p in players.Values.Where(x => !ignoreBots || !x.IsBot))
             {
                 string fillcolor;
 
                 if (!p.IsBot)
                 {
-                    if (p.Name == "acha11" || p.Name == "ledpup" || p.Name == "RavenMark" || p.Name == "Playcache")
+                    if (p.TeamId == playerTeamId)
                     {
                         fillcolor = "yellow";
                     }

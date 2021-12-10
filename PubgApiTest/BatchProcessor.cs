@@ -23,13 +23,17 @@ namespace PubgApiTest
             _pubgApi = pubgApi;
         }
 
-        public void ProcessRecentMatchesForPlayer(string playerName)
+        public void ProcessRecentMatchesForPlayer(string playerName, int numberOfMatches = 5)
         {
             string rawResponse = _pubgApi.ExecuteGetRequest("https://api.pubg.com/shards/steam/players?filter[playerNames]=" + playerName, false);
 
             var playerInfo = JObject.Parse(rawResponse);
 
-            var matchDatas = playerInfo.SelectToken("data[0].relationships.matches.data");
+            var matchDatas = playerInfo
+                                .SelectToken("data[0].relationships.matches.data")
+                                .Take(numberOfMatches);
+
+            var playerAccountId = playerInfo.SelectToken("data[0].id").ToString();
 
             foreach (var matchData in matchDatas)
             {
@@ -70,12 +74,12 @@ namespace PubgApiTest
 
                 if (telemetryUrl != null)
                 {
-                    ProcessTelemetry(telemetryUrl, matchLocalTime);
+                    ProcessTelemetry(telemetryUrl, matchLocalTime, playerAccountId);
                 }
             }
         }
 
-        void ProcessTelemetry(string telemetryUrl, DateTime matchLocalTime)
+        void ProcessTelemetry(string telemetryUrl, DateTime matchLocalTime, string playerAccountId)
         {
             _playersByAccountId = new Dictionary<string, PlayerInfo>();
 
@@ -443,7 +447,7 @@ namespace PubgApiTest
 
             using (var sw = new StreamWriter(dotFilename))
             {
-                new KillsOverviewGraphGenerator(_matchStartTime).Generate(sw, _playersByAccountId, "Match at " + matchLocalTime.ToString());
+                new KillsOverviewGraphGenerator(_matchStartTime).Generate(sw, _playersByAccountId, "Match at " + matchLocalTime.ToString(), playerAccountId);
             }
 
             var p =
